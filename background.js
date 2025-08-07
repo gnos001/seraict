@@ -68,5 +68,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
       });
       return true;
+  } else if (request.action === 'saveNote') {
+      const { note } = request;
+      const key = `${note.url}-notes`;
+      chrome.storage.local.get([key], (result) => {
+          let notes = result[key] || [];
+          const noteIndex = notes.findIndex(n => n.id === note.id);
+          if (noteIndex !== -1) {
+              notes[noteIndex] = note; // Update existing note
+          } else {
+              notes.push(note); // Add new note
+          }
+          chrome.storage.local.set({ [key]: notes }, () => {
+              sendResponse({ status: 'success' });
+          });
+      });
+      return true;
+  } else if (request.action === 'getNotes') {
+      const key = `${request.url}-notes`;
+      chrome.storage.local.get([key], (result) => {
+          sendResponse({ notes: result[key] || [] });
+      });
+      return true;
   }
 });

@@ -2,11 +2,27 @@
 // It will handle text selection and highlighting.
 console.log("Content script loaded.");
 
+let isEditMode = false;
+let isNoteMode = false;
+
 // Listen for messages from the popup or background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'highlight' || request.action === 'underline') {
     applyStyle(request.action);
     sendResponse({ status: 'action completed' });
+  } else if (request.action === 'getEditModeState') {
+    sendResponse({ isEditMode: isEditMode });
+  } else if (request.action === 'setEditMode') {
+    isEditMode = request.enabled;
+    if (isEditMode) {
+      document.body.classList.add('text-highlighter-edit-mode');
+    } else {
+      document.body.classList.remove('text-highlighter-edit-mode');
+    }
+    sendResponse({ status: 'success' });
+  } else if (request.action === 'enterNoteMode') {
+    enterNoteMode();
+    sendResponse({ status: 'success' });
   }
   return true;
 });
@@ -151,10 +167,26 @@ function loadHighlights() {
 }
 
 // Run the restoration logic after the page has fully loaded
-if (document.readyState === 'complete') {
+function loadAll() {
     loadHighlights();
+    loadNotes();
+}
+
+function loadNotes() {
+    chrome.runtime.sendMessage({ action: 'getNotes', url: window.location.href }, response => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError.message);
+            return;
+        }
+        const notes = response.notes || [];
+        notes.forEach(displaySavedNote);
+    });
+}
+
+if (document.readyState === 'complete') {
+    loadAll();
 } else {
-    window.addEventListener('load', loadHighlights);
+    window.addEventListener('load', loadAll);
 }
 
 // --- Deletion and Modification UI ---
@@ -221,8 +253,13 @@ document.addEventListener('click', (event) => {
 
     // Check if a highlight span was clicked
     if (target.dataset.highlightId) {
-        showActionMenu(target);
-        event.stopPropagation(); // Prevent the click from immediately closing the menu
+        if (isEditMode) {
+            // In edit mode, prevent link navigation and show the menu
+            event.preventDefault();
+            showActionMenu(target);
+            event.stopPropagation(); // Prevent the click from immediately closing the menu
+        }
+        // In read mode, do nothing and let the default link behavior occur.
         return;
     }
 
@@ -238,3 +275,143 @@ document.addEventListener('click', (event) => {
         activeMenu = null;
     }
 });
+
+// --- Standalone Note Feature ---
+
+function enterNoteMode() {
+    if (isNoteMode) return; // Already in note mode
+
+    isNoteMode = true;
+    document.body.style.cursor = 'crosshair';
+
+    const placeNoteListener = (event) => {
+        // Don't place a note on existing UI
+        if (event.target.closest('.text-highlighter-action-menu, .text-highlighter-note')) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const x = event.pageX;
+        const y = event.pageY;
+
+        showNoteInput(x, y);
+
+        // Cleanup
+        isNoteMode = false;
+        document.body.style.cursor = 'default';
+        document.removeEventListener('click', placeNoteListener, true); // Use capture to intercept click first
+    };
+
+    // Use capture phase to ensure this listener runs before any others
+    document.addEventListener('click', placeNoteListener, { capture: true, once: true });
+}
+
+function showNoteInput(x, y, existingNote = {}) {
+    const noteId = existingNote.id || `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const noteWrapper = document.createElement('div');
+    noteWrapper.className = 'text-highlighter-note';
+    noteWrapper.style.left = `${x}px`;
+    noteWrapper.style.top = `${y}px`;
+    noteWrapper.dataset.noteId = noteId;
+
+    const noteHeader = document.createElement('div');
+    noteHeader.className = 'note-header';
+    noteHeader.textContent = '주석 (드래그하여 이동)';
+
+    const noteText = document.createElement('textarea');
+    noteText.placeholder = '여기에 주석을 입력하세요...';
+    noteText.value = existingNote.comment || '';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '저장';
+    saveBtn.onclick = () => {
+        const noteInfo = {
+            id: noteId,
+            url: window.location.href,
+            x: parseInt(noteWrapper.style.left, 10),
+            y: parseInt(noteWrapper.style.top, 10),
+            comment: noteText.value,
+        };
+
+        chrome.runtime.sendMessage({ action: 'saveNote', note: noteInfo });
+
+        // Replace input with static display
+        noteWrapper.remove();
+        displaySavedNote(noteInfo);
+    };
+
+    noteWrapper.appendChild(noteHeader);
+    noteWrapper.appendChild(noteText);
+    noteWrapper.appendChild(saveBtn);
+
+    makeDraggable(noteWrapper, noteHeader);
+
+    document.body.appendChild(noteWrapper);
+    noteText.focus();
+}
+
+function makeDraggable(element, handle) {
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    handle.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e) {
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        element.style.top = (element.offsetTop - pos2) + "px";
+        element.style.left = (element.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+}
+
+function displaySavedNote(noteInfo) {
+    const noteIcon = document.createElement('div');
+    noteIcon.className = 'text-highlighter-note-icon';
+    noteIcon.style.left = `${noteInfo.x}px`;
+    noteIcon.style.top = `${noteInfo.y}px`;
+    noteIcon.title = `주석: ${noteInfo.comment}\n(클릭하여 수정)`;
+    noteIcon.dataset.noteId = noteInfo.id;
+
+    noteIcon.onclick = (e) => {
+        e.stopPropagation();
+        // Remove the icon and show the editor
+        noteIcon.remove();
+        showNoteInput(noteInfo.x, noteInfo.y, noteInfo);
+    };
+
+    const deleteBtn = document.createElement('div');
+    deleteBtn.className = 'note-delete-btn';
+    deleteBtn.innerHTML = '&times;'; // 'x' character
+    deleteBtn.title = '주석 삭제';
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        noteIcon.remove();
+        // Also remove from storage
+        const key = `${window.location.href}-notes`;
+        chrome.storage.local.get([key], (result) => {
+            let notes = result[key] || [];
+            const filteredNotes = notes.filter(n => n.id !== noteInfo.id);
+            chrome.storage.local.set({ [key]: filteredNotes });
+        });
+    };
+
+    noteIcon.appendChild(deleteBtn);
+    document.body.appendChild(noteIcon);
+}
