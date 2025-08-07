@@ -70,6 +70,7 @@ function applyStyle(action) {
   if (range.toString().trim() === '') return;
 
   const highlightInfo = {
+    id: `highlight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     url: window.location.href,
     text: range.toString(),
     action: action,
@@ -81,7 +82,7 @@ function applyStyle(action) {
   };
 
   // Visually apply the style immediately
-  styleRange(range, action);
+  styleRange(range, highlightInfo.action, highlightInfo.id);
 
   // Save the highlight
   chrome.runtime.sendMessage({ action: 'saveHighlight', highlight: highlightInfo }, response => {
@@ -92,9 +93,10 @@ function applyStyle(action) {
   selection.removeAllRanges();
 }
 
-function styleRange(range, action) {
+function styleRange(range, action, id) {
     const span = document.createElement('span');
     span.className = action === 'highlight' ? 'text-highlighter-highlight' : 'text-highlighter-underline';
+    span.dataset.highlightId = id; // Add this line
     try {
         range.surroundContents(span);
     } catch (e) {
@@ -126,7 +128,7 @@ function restoreHighlight(highlight) {
             return;
         }
 
-        styleRange(range, highlight.action);
+        styleRange(range, highlight.action, highlight.id);
 
     } catch (error) {
         console.error('Error restoring highlight:', highlight, error);
@@ -154,3 +156,85 @@ if (document.readyState === 'complete') {
 } else {
     window.addEventListener('load', loadHighlights);
 }
+
+// --- Deletion and Modification UI ---
+
+let activeMenu = null;
+
+function showActionMenu(spanElement) {
+    // Remove any existing menu
+    if (activeMenu) {
+        activeMenu.remove();
+    }
+
+    const rect = spanElement.getBoundingClientRect();
+
+    activeMenu = document.createElement('div');
+    activeMenu.className = 'text-highlighter-action-menu';
+    activeMenu.style.position = 'absolute';
+    activeMenu.style.top = `${window.scrollY + rect.bottom}px`;
+    activeMenu.style.left = `${window.scrollX + rect.left}px`;
+    activeMenu.style.zIndex = 10000;
+
+    // Delete Button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = '삭제';
+    deleteBtn.onclick = () => {
+        const highlightId = spanElement.dataset.highlightId;
+
+        // Unwrap the span
+        spanElement.outerHTML = spanElement.innerHTML;
+
+        // Remove from storage
+        chrome.runtime.sendMessage({ action: 'deleteHighlight', url: window.location.href, highlightId });
+
+        activeMenu.remove();
+        activeMenu = null;
+    };
+    activeMenu.appendChild(deleteBtn);
+
+    // Modify Button
+    const modifyBtn = document.createElement('button');
+    modifyBtn.textContent = '스타일 변경';
+    modifyBtn.onclick = () => {
+        const highlightId = spanElement.dataset.highlightId;
+        const currentAction = spanElement.classList.contains('text-highlighter-highlight') ? 'highlight' : 'underline';
+        const newAction = currentAction === 'highlight' ? 'underline' : 'highlight';
+
+        // Update class on page
+        spanElement.className = `text-highlighter-${newAction}`;
+
+        // Update in storage
+        chrome.runtime.sendMessage({ action: 'updateHighlight', url: window.location.href, highlightId, newAction });
+
+        activeMenu.remove();
+        activeMenu = null;
+    };
+    activeMenu.appendChild(modifyBtn);
+
+    document.body.appendChild(activeMenu);
+}
+
+// Global click listener
+document.addEventListener('click', (event) => {
+    const target = event.target;
+
+    // Check if a highlight span was clicked
+    if (target.dataset.highlightId) {
+        showActionMenu(target);
+        event.stopPropagation(); // Prevent the click from immediately closing the menu
+        return;
+    }
+
+    // Check if the click was inside the action menu
+    if (activeMenu && activeMenu.contains(target)) {
+        // Click was inside the menu, do nothing
+        return;
+    }
+
+    // Click was outside, so hide any active menu
+    if (activeMenu) {
+        activeMenu.remove();
+        activeMenu = null;
+    }
+});

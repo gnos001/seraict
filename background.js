@@ -43,5 +43,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     });
     return true; // Indicates that the response is sent asynchronously
+  } else if (request.action === 'deleteHighlight') {
+    const { url, highlightId } = request;
+    chrome.storage.local.get([url], (result) => {
+        let highlights = result[url] || [];
+        const filteredHighlights = highlights.filter(h => h.id !== highlightId);
+        chrome.storage.local.set({ [url]: filteredHighlights }, () => {
+            sendResponse({ status: 'success' });
+        });
+    });
+    return true;
+  } else if (request.action === 'updateHighlight') {
+      const { url, highlightId, newAction } = request;
+      chrome.storage.local.get([url], (result) => {
+          let highlights = result[url] || [];
+          const highlightIndex = highlights.findIndex(h => h.id === highlightId);
+          if (highlightIndex !== -1) {
+              highlights[highlightIndex].action = newAction;
+              chrome.storage.local.set({ [url]: highlights }, () => {
+                  sendResponse({ status: 'success', updatedHighlight: highlights[highlightIndex] });
+              });
+          } else {
+              sendResponse({ status: 'error', message: 'Highlight not found' });
+          }
+      });
+      return true;
   }
 });

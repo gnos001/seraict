@@ -1,9 +1,33 @@
 .text-highlighter-highlight {
   background-color: yellow;
+  cursor: pointer;
 }
 
 .text-highlighter-underline {
   text-decoration: underline;
   text-decoration-style: wavy;
   text-decoration-color: red;
+  cursor: pointer;
+}
+
+.text-highlighter-action-menu {
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    padding: 5px;
+    display: flex;
+    gap: 5px;
+}
+
+.text-highlighter-action-menu button {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.text-highlighter-action-menu button:hover {
+    background-color: #e0e0e0;
 }
