@@ -1,0 +1,9 @@
+.text-highlighter-highlight {
+  background-color: yellow;
+}
+
+.text-highlighter-underline {
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: red;
+}

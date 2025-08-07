@@ -1,0 +1,23 @@
+body {
+  font-family: sans-serif;
+  width: 200px;
+  padding: 10px;
+}
+
+h3 {
+  text-align: center;
+  margin-top: 0;
+}
+
+button {
+  width: 100%;
+  margin: 5px 0;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #f0f0f0;
+}
