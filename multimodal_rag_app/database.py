@@ -18,11 +18,8 @@ model = SentenceTransformer(EMBEDDING_MODEL)
 print("Initialization complete.")
 
 
-# Get or create the collection
-try:
-    collection = client.get_collection(name=COLLECTION_NAME)
-except ValueError:
-    collection = client.create_collection(name=COLLECTION_NAME)
+# Get or create the collection. This is an idempotent operation.
+collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
 # --- Helper Functions ---
 
