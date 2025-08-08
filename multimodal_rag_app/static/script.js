@@ -49,7 +49,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (response.ok) {
-                uploadStatus.textContent = `Success: ${result.message} (ID: ${result.doc_id})`;
+                // Create a container for the status message and delete button
+                const statusContainer = document.createElement('div');
+                statusContainer.innerHTML = `
+                    <span>Success: ${result.message} (ID: ${result.doc_id})</span>
+                    <button class="delete-btn" data-doc-id="${result.doc_id}">Delete</button>
+                `;
+                uploadStatus.innerHTML = ''; // Clear previous status
+                uploadStatus.appendChild(statusContainer);
+
+                // Add listener to the new delete button
+                statusContainer.querySelector('.delete-btn').addEventListener('click', handleDelete);
             } else {
                 uploadStatus.textContent = `Error: ${result.detail}`;
             }
@@ -57,6 +67,35 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadStatus.textContent = `An error occurred: ${error.message}`;
         }
     });
+
+    // Handle delete button click
+    async function handleDelete(e) {
+        const docId = e.target.dataset.docId;
+        if (!docId) return;
+
+        if (!confirm(`Are you sure you want to delete document ${docId}?`)) {
+            return;
+        }
+
+        e.target.textContent = 'Deleting...';
+        e.target.disabled = true;
+
+        try {
+            const response = await fetch(`/delete/${docId}`, {
+                method: 'DELETE',
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                e.target.parentElement.innerHTML = `<span>${result.message}</span>`;
+            } else {
+                e.target.parentElement.innerHTML = `<span>Error: ${result.detail}</span>`;
+            }
+        } catch (error) {
+            e.target.parentElement.innerHTML = `<span>An error occurred: ${error.message}</span>`;
+        }
+    }
 
     // Handle chat submission
     chatForm.addEventListener('submit', async (e) => {

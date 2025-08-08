@@ -59,9 +59,9 @@ async def upload_data(data_type: str = Form(...), text_content: str = Form(None)
         doc_id = db.add_text(text_content)
         return {"message": "Text content added successfully.", "doc_id": doc_id}
 
-    elif data_type in ['image', 'video']:
+    elif data_type in ['image', 'video', 'pdf', 'doc']:
         if not file:
-            raise HTTPException(status_code=400, detail="A file is required for data_type 'image' or 'video'")
+            raise HTTPException(status_code=400, detail=f"A file is required for data_type '{data_type}'")
 
         try:
             # Save the uploaded file temporarily
@@ -70,22 +70,31 @@ async def upload_data(data_type: str = Form(...), text_content: str = Form(None)
                 shutil.copyfileobj(file.file, buffer)
 
             # Add the file to the database
+            doc_id = None
             if data_type == 'image':
                 doc_id = db.add_image(file_path)
-            else: # video
+            elif data_type == 'video':
                 doc_id = db.add_video(file_path)
+            elif data_type == 'pdf':
+                doc_id = db.add_pdf(file_path)
+            elif data_type == 'doc':
+                doc_id = db.add_doc(file_path)
 
             # The file can be removed after processing if no longer needed
             # os.remove(file_path)
 
-            return {"message": f"{data_type.capitalize()} uploaded and processed.", "doc_id": doc_id}
+            if doc_id:
+                return {"message": f"{data_type.capitalize()} uploaded and processed.", "doc_id": doc_id}
+            else:
+                raise HTTPException(status_code=400, detail=f"Could not process file {file.filename}. It might be empty or corrupted.")
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to process file: {e}")
         finally:
             file.file.close()
 
     else:
-        raise HTTPException(status_code=400, detail="Invalid data_type. Must be 'text', 'image', or 'video'.")
+        raise HTTPException(status_code=400, detail="Invalid data_type. Must be 'text', 'image', 'video', 'pdf', or 'doc'.")
 
 
 @app.post("/chat/")
@@ -131,6 +140,21 @@ User Question: {message.query}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred during chat processing: {e}")
+
+
+@app.delete("/delete/{doc_id}", status_code=200)
+async def delete_document(doc_id: str):
+    """
+    Deletes a document from the vector database by its ID.
+    """
+    try:
+        db.delete_data(doc_id)
+        return {"message": f"Document {doc_id} deleted successfully."}
+    except Exception as e:
+        # This could happen if the ID doesn't exist, though ChromaDB's delete is idempotent.
+        # A more specific exception might be better if the library provides one.
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {e}")
+
 
 # --- Main Execution ---
 if __name__ == "__main__":

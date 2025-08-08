@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 import cv2
 import os
+import fitz  # PyMuPDF
+import docx
 
 # --- Configuration ---
 DB_PATH = "chroma_db"
@@ -149,3 +151,64 @@ def search(query: str, n_results: int = 5):
         n_results=n_results
     )
     return results
+
+def delete_data(doc_id: str):
+    """Deletes a document from the collection by its ID."""
+    collection.delete(ids=[doc_id])
+
+def add_pdf(file_path: str, metadata: dict = None):
+    """Extracts text from a PDF, embeds it, and adds it to the collection."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"PDF file not found: {file_path}")
+
+    doc = fitz.open(file_path)
+    text_content = ""
+    for page in doc:
+        text_content += page.get_text()
+    doc.close()
+
+    if not text_content.strip():
+        return None # Or raise an error if empty PDFs are not allowed
+
+    embedding = _embed_text(text_content)
+    doc_id = f"pdf_{os.path.basename(file_path)}_{hash(file_path)}"
+
+    if metadata is None:
+        metadata = {}
+    metadata['type'] = 'pdf'
+    metadata['path'] = file_path
+
+    collection.add(
+        ids=[doc_id],
+        embeddings=[embedding],
+        documents=[text_content],
+        metadatas=[metadata]
+    )
+    return doc_id
+
+def add_doc(file_path: str, metadata: dict = None):
+    """Extracts text from a DOCX file, embeds it, and adds it to the collection."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"DOCX file not found: {file_path}")
+
+    doc = docx.Document(file_path)
+    text_content = "\n".join([para.text for para in doc.paragraphs])
+
+    if not text_content.strip():
+        return None
+
+    embedding = _embed_text(text_content)
+    doc_id = f"doc_{os.path.basename(file_path)}_{hash(file_path)}"
+
+    if metadata is None:
+        metadata = {}
+    metadata['type'] = 'doc'
+    metadata['path'] = file_path
+
+    collection.add(
+        ids=[doc_id],
+        embeddings=[embedding],
+        documents=[text_content],
+        metadatas=[metadata]
+    )
+    return doc_id
