@@ -1,0 +1,20 @@
+[project]
+name = "multimodal-rag-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.61.0",
+    "chromadb>=1.0.16",
+    "fastapi>=0.116.1",
+    "mcp[cli]>=1.12.4",
+    "opencv-python>=4.12.0.88",
+    "pillow>=11.3.0",
+    "pydantic>=2.11.7",
+    "python-multipart>=0.0.20",
+    "sentence-transformers>=5.1.0",
+    "torch>=2.8.0",
+    "torchvision>=0.23.0",
+    "uvicorn>=0.35.0",
+]

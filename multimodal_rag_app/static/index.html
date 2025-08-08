@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multimodal RAG System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Multimodal RAG System</h1>
+
+        <div class="section">
+            <h2>1. Add Data to the System</h2>
+            <form id="upload-form">
+                <label for="data-type">Select Data Type:</label>
+                <select id="data-type" name="data-type">
+                    <option value="text">Text</option>
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                </select>
+
+                <div id="text-input-section">
+                    <label for="text-content">Text Content:</label>
+                    <textarea id="text-content" name="text-content" rows="4"></textarea>
+                </div>
+
+                <div id="file-input-section" style="display: none;">
+                    <label for="file">Select File:</label>
+                    <input type="file" id="file" name="file">
+                </div>
+
+                <button type="submit">Upload Data</button>
+            </form>
+            <div id="upload-status"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. Chat with the RAG System</h2>
+            <div id="chat-box"></div>
+            <form id="chat-form">
+                <input type="text" id="chat-input" placeholder="Ask a question...">
+                <button type="submit">Send</button>
+            </form>
+             <div id="chat-status"></div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
